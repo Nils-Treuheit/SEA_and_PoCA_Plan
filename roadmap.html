@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEA and PoAC — Project Roadmap</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --surface2: #232733;
+  --border: #2e3345;
+  --text: #e4e6f0;
+  --text-dim: #8b8fa3;
+  --accent: #6c8cff;
+  --wp1: #ff6b6b;
+  --wp2: #ffa94d;
+  --wp3: #ffd43b;
+  --wp4: #69db7c;
+  --wp5: #42a5f5;
+  --wp6: #b197fc;
+  --wp7: #f783ac;
+  --wp8: #fcc419;
+  --wp9: #63e6be;
+  --wp10: #74c0fc;
+  --wp11: #e599f7;
+  --m1: #ff6b6b;
+  --m2: #ffa94d;
+  --m3: #ffd43b;
+  --m4: #69db7c;
+  --m5: #42a5f5;
+  --m6: #b197fc;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+.header {
+  padding: 2rem 3rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+
+.header .subtitle {
+  color: var(--text-dim);
+  font-size: 0.95rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem 3rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  padding: 0.5rem 1.25rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.tab:hover { color: var(--text); background: var(--surface2); }
+.tab.active { background: var(--accent); color: white; border-color: var(--accent); }
+
+.panel { display: none; padding: 2rem 3rem; }
+.panel.active { display: block; }
+
+/* ===== GANTT CHART ===== */
+.gantt-container {
+  position: relative;
+  overflow-x: auto;
+}
+
+.gantt-svg {
+  min-width: 1100px;
+  height: 680px;
+}
+
+.gantt-label {
+  font-size: 12px;
+  fill: var(--text-dim);
+  text-anchor: end;
+  dominant-baseline: middle;
+}
+
+.gantt-label-highlight {
+  font-size: 12px;
+  fill: var(--text);
+  text-anchor: end;
+  dominant-baseline: middle;
+  font-weight: 600;
+}
+
+.gantt-bar {
+  rx: 4;
+  ry: 4;
+  cursor: pointer;
+  transition: filter 0.2s;
+}
+
+.gantt-bar:hover { filter: brightness(1.3); }
+
+.gantt-month {
+  font-size: 11px;
+  fill: var(--text-dim);
+  text-anchor: middle;
+  font-weight: 500;
+}
+
+.gantt-month-line {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.gantt-grid {
+  stroke: var(--border);
+  stroke-width: 0.5;
+  stroke-opacity: 0.5;
+}
+
+/* Milestone diamonds */
+.milestone-diamond {
+  cursor: pointer;
+  transition: transform 0.2s;
+  transform-origin: center;
+}
+
+.milestone-diamond:hover { transform: scale(1.4); }
+
+.milestone-label {
+  font-size: 10px;
+  fill: var(--text);
+  text-anchor: middle;
+  font-weight: 600;
+}
+
+/* Phase bands */
+.phase-band {
+  rx: 8;
+  ry: 8;
+}
+
+.phase-label {
+  font-size: 13px;
+  fill: var(--text-dim);
+  text-anchor: start;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Tooltip */
+.tooltip {
+  position: fixed;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  font-size: 12px;
+  color: var(--text);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1000;
+  max-width: 300px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+.tooltip.visible { opacity: 1; }
+.tooltip .tt-title { font-weight: 700; margin-bottom: 0.25rem; font-size: 13px; }
+.tooltip .tt-desc { color: var(--text-dim); margin-bottom: 0.5rem; }
+.tooltip .tt-meta { display: flex; gap: 1rem; }
+.tooltip .tt-meta span { color: var(--text-dim); font-size: 11px; }
+.tooltip .tt-meta strong { color: var(--text); }
+
+/* ===== DEPENDENCY GRAPH ===== */
+.dep-graph-container {
+  position: relative;
+  overflow: auto;
+}
+
+.dep-graph-svg {
+  min-width: 1200px;
+  min-height: 700px;
+}
+
+.dep-node {
+  cursor: pointer;
+  transition: filter 0.2s;
+}
+
+.dep-node:hover { filter: brightness(1.3); }
+
+.dep-node-rect {
+  rx: 6;
+  ry: 6;
+  stroke-width: 2;
+}
+
+.dep-node-label {
+  font-size: 11px;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  font-weight: 600;
+}
+
+.dep-edge {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 2;
+  marker-end: url(#arrowhead);
+}
+
+.dep-edge-highlight {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  marker-end: url(#arrowhead-hl);
+  opacity: 0.7;
+}
+
+.dep-phase-rect {
+  rx: 12;
+  ry: 12;
+  stroke-width: 1;
+  stroke-dasharray: 6 4;
+}
+
+/* ===== TIMELINE VIEW ===== */
+.timeline {
+  position: relative;
+  padding: 2rem 0;
+}
+
+.timeline-line {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--border);
+  transform: translateX(-50%);
+}
+
+.timeline-item {
+  position: relative;
+  width: 45%;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.timeline-item:hover {
+  border-color: var(--accent);
+  box-shadow: 0 4px 24px rgba(108,140,255,0.1);
+}
+
+.timeline-item::before {
+  content: '';
+  position: absolute;
+  top: 1.5rem;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 3px solid var(--accent);
+  background: var(--bg);
+}
+
+.timeline-item.left {
+  margin-right: auto;
+  padding-right: 2.5rem;
+}
+
+.timeline-item.left::before {
+  right: -36px;
+}
+
+.timeline-item.right {
+  margin-left: auto;
+  padding-left: 2.5rem;
+}
+
+.timeline-item.right::before {
+  left: -36px;
+}
+
+.timeline-item .item-phase {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.timeline-item .item-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.timeline-item .item-desc {
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  margin-bottom: 0.75rem;
+}
+
+.timeline-item .item-deliverables {
+  list-style: none;
+  padding: 0;
+}
+
+.timeline-item .item-deliverables li {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  padding: 0.15rem 0;
+  padding-left: 1rem;
+  position: relative;
+}
+
+.timeline-item .item-deliverables li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+}
+
+.timeline-item .item-months {
+  display: inline-block;
+  font-size: 0.75rem;
+  background: var(--surface2);
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  color: var(--text-dim);
+  margin-top: 0.5rem;
+  font-weight: 500;
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+/* Summary cards */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.summary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  text-align: center;
+}
+
+.summary-card .card-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.summary-card .card-label {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  margin-top: 0.25rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .header, .tabs, .panel { padding-left: 1rem; padding-right: 1rem; }
+  .timeline-item { width: 85%; margin-left: auto !important; margin-right: auto !important; }
+  .timeline-line { left: 20px; }
+  .timeline-item::before { left: 12px !important; right: auto !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🗺️ SEA and PoAC Project Roadmap</h1>
+  <div class="subtitle">12-month research program · 11 Work Packages · 6 Milestones</div>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="showPanel('gantt')">📊 Gantt Chart</button>
+  <button class="tab" onclick="showPanel('dependency')">🔗 Dependency Graph</button>
+  <button class="tab" onclick="showPanel('timeline')">📅 Timeline</button>
+</div>
+
+<!-- Summary Cards -->
+<div class="summary-cards" style="padding: 1.5rem 3rem 0;">
+  <div class="summary-card"><div class="card-value">11</div><div class="card-label">Work Packages</div></div>
+  <div class="summary-card"><div class="card-value">6</div><div class="card-label">Milestones</div></div>
+  <div class="summary-card"><div class="card-value">12</div><div class="card-label">Months</div></div>
+  <div class="summary-card"><div class="card-value">3</div><div class="card-label">Phases</div></div>
+</div>
+
+<!-- GANTT PANEL -->
+<div id="panel-gantt" class="panel active">
+  <div class="gantt-container">
+    <svg class="gantt-svg" id="gantt-svg"></svg>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--wp1)"></div>WP1: Human Detection</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--wp2)"></div>WP2: Action Prediction</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--wp3)"></div>WP3: Env Analysis</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--wp4)"></div>WP4: Multi-Obj Tracking</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--wp5)"></div>WP5: Scene Interpretation</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--wp6)"></div>WP6: HRI</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--wp7)"></div>WP7: Motion Planning</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--wp8)"></div>WP8: Trajectory Planning</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--wp9)"></div>WP9: Control & Motion Gen</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--wp10)"></div>WP10: Task Planning</div>
+    <div class="legend-item"><div class="legend-swatch" style="background:var(--wp11)"></div>WP11: Action Recommendation</div>
+    <div class="legend-item"><svg width="16" height="16" viewBox="0 0 16 16"><polygon points="8,1 15,8 8,15 1,8" fill="#b197fc" stroke="#b197fc" stroke-width="1"/></svg> Milestone</div>
+  </div>
+</div>
+
+<!-- DEPENDENCY GRAPH PANEL -->
+<div id="panel-dependency" class="panel">
+  <div class="dep-graph-container">
+    <svg class="dep-graph-svg" id="dep-svg"></svg>
+  </div>
+</div>
+
+<!-- TIMELINE PANEL -->
+<div id="panel-timeline" class="panel">
+  <div class="timeline" id="timeline-container"></div>
+</div>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip">
+  <div class="tt-title"></div>
+  <div class="tt-desc"></div>
+  <div class="tt-meta"></div>
+</div>
+
+<script>
+// ===== DATA =====
+const months = 12;
+const monthNames = ['M1','M2','M3','M4','M5','M6','M7','M8','M9','M10','M11','M12'];
+
+const phases = [
+  { name: 'Phase 1: Perception Foundation', start: 1, end: 4, color: '#1e3a5f' },
+  { name: 'Phase 2: Semantic Layer', start: 5, end: 6, color: '#2d2a5e' },
+  { name: 'Phase 3: Integration & Deployment', start: 7, end: 12, color: '#1a3a2e' }
+];
+
+const milestones = [
+  { id: 'M1', label: 'Detection & Pose', start: 2, month: 2, desc: 'Deployed YOLOv11/MediaPipe baseline on edge hardware', color: '#ff6b6b' },
+  { id: 'M2', label: 'Action + Tracking', start: 4, month: 4, desc: 'SlowFast + Social-LSTM baseline deployed', color: '#ffa94d' },
+  { id: 'M3', label: 'Semantic Map', start: 4, month: 4, desc: 'Real-time semantic map with detected objects/materials', color: '#ffd43b' },
+  { id: 'M4', label: 'Interaction Module', start: 6, month: 6, desc: 'Interaction Transformer + trust evaluation pipeline', color: '#69db7c' },
+  { id: 'M5', label: 'Integrated Demo', start: 9, month: 9, desc: 'Full SEA system in Test Case 1 (factory)', color: '#42a5f5' },
+  { id: 'M6', label: 'Deployment + Publish', start: 12, month: 12, desc: 'Optimized edge deployment + peer-reviewed papers', color: '#b197fc' }
+];
+
+const wps = [
+  { id: 'WP1', name: 'Human Detection & Pose', start: 1, end: 3, color: '#ff6b6b', desc: 'Detect humans + estimate poses/gestures in real-time', methods: 'YOLOv11, MediaPipe, ST-GCN' },
+  { id: 'WP2', name: 'Action Prediction', start: 1, end: 4, color: '#ffa94d', desc: 'Predict where a person is going and what they will do next', methods: 'SlowFast, Social-LSTM, Motion Transformer' },
+  { id: 'WP3', name: 'Semantic Env Analysis', start: 3, end: 4, color: '#ffd43b', desc: 'Detect/understand objects, materials, spatial relationships', methods: 'VoteNet, PointPillars, Scene Graph Transformer' },
+  { id: 'WP4', name: 'Multi-Object Tracking', start: 1, end: 4, color: '#69db7c', desc: 'Maintain persistent IDs across cameras and time', methods: 'ByteTrack, DeepSORT, TrackR-CNN' },
+  { id: 'WP5', name: 'Scene Interpretation', start: 5, end: 6, color: '#42a5f5', desc: 'Build structured scene representation (entities, relationships, goals)', methods: 'Scene Graph Transformer, VLM reasoning' },
+  { id: 'WP6', name: 'Human-Robot Interaction', start: 5, end: 6, color: '#b197fc', desc: 'Analyze interaction quality, trust, and collaboration', methods: 'Interaction Transformer, trust metrics' },
+  { id: 'WP7', name: 'Robot Motion Planning', start: 7, end: 9, color: '#f783ac', desc: 'Plan safe, efficient, socially-aware robot paths', methods: 'DWA, APF, MPC-based planners' },
+  { id: 'WP8', name: 'Trajectory Planning', start: 7, end: 9, color: '#fcc419', desc: 'Generate socially-compliant motion trajectories', methods: 'RRT*, Social force models' },
+  { id: 'WP9', name: 'Control & Motion Gen', start: 7, end: 9, color: '#63e6be', desc: 'Generate low-level control commands for planned motions', methods: 'Trajectory optimization, control barrier functions' },
+  { id: 'WP10', name: 'Human-Aware Task Planning', start: 9, end: 10, color: '#74c0fc', desc: 'Plan robot tasks respecting human presence and intentions', methods: 'PDDL, intent-aware planning' },
+  { id: 'WP11', name: 'Action Recommendation', start: 9, end: 10, color: '#e599f7', desc: 'Recommend optimal robot actions based on context', methods: 'Multi-criteria scoring, decision support' }
+];
+
+const dependencies = [
+  { from: 'WP1', to: 'WP2' },
+  { from: 'WP1', to: 'WP4' },
+  { from: 'WP1', to: 'WP5' },
+  { from: 'WP2', to: 'WP5' },
+  { from: 'WP3', to: 'WP5' },
+  { from: 'WP4', to: 'WP2' },
+  { from: 'WP4', to: 'WP5' },
+  { from: 'WP5', to: 'WP6' },
+  { from: 'WP5', to: 'WP10' },
+  { from: 'WP6', to: 'WP11' },
+  { from: 'WP7', to: 'WP9' },
+  { from: 'WP8', to: 'WP9' },
+  { from: 'WP10', to: 'WP11' },
+  { from: 'WP2', to: 'M2' },
+  { from: 'WP3', to: 'M3' },
+  { from: 'WP4', to: 'M2' },
+  { from: 'WP5', to: 'M4' },
+  { from: 'WP6', to: 'M4' },
+  { from: 'WP7', to: 'M5' },
+  { from: 'WP8', to: 'M5' },
+  { from: 'WP9', to: 'M5' },
+  { from: 'WP10', to: 'M5' },
+  { from: 'WP11', to: 'M5' },
+  { from: 'M4', to: 'M5' },
+  { from: 'M5', to: 'M6' }
+];
+
+// ===== GANTT CHART =====
+function buildGantt() {
+  const svg = document.getElementById('gantt-svg');
+  const W = 1100, H = 680;
+  const labelW = 220, barLeft = labelW + 30, barW = W - labelW - 40;
+  const monthW = barW / months;
+  const rowH = 32;
+  const topPad = 80;
+
+  let html = `<defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#555"/>
+    </marker>
+    <marker id="arrowhead-hl" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#6c8cff"/>
+    </marker>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>`;
+
+  // Phase bands
+  phases.forEach(p => {
+    const x1 = barLeft + (p.start - 1) * monthW;
+    const x2 = barLeft + p.end * monthW;
+    html += `<rect x="${x1}" y="${topPad - 40}" width="${x2 - x1}" height="${wps.length * rowH + 100}" fill="${p.color}" opacity="0.3" class="phase-band"/>`;
+    html += `<text x="${x1 + 10}" y="${topPad - 22}" class="phase-label">${p.name}</text>`;
+  });
+
+  // Month lines & labels
+  for (let m = 1; m <= months; m++) {
+    const x = barLeft + (m - 1) * monthW;
+    html += `<line x1="${x}" y1="${topPad}" x2="${x}" y2="${topPad + wps.length * rowH}" class="gantt-month-line"/>`;
+    html += `<text x="${x + monthW / 2}" y="${topPad - 55}" class="gantt-month">Month ${m}</text>`;
+  }
+
+  // WP bars
+  wps.forEach((wp, i) => {
+    const y = topPad + i * rowH;
+    const x1 = barLeft + (wp.start - 1) * monthW;
+    const w = (wp.end - wp.start + 1) * monthW;
+
+    // Row background
+    if (i % 2 === 0) {
+      html += `<rect x="${labelW}" y="${y}" width="${barW}" height="${rowH}" fill="rgba(255,255,255,0.02)"/>`;
+    }
+
+    // Label
+    html += `<text x="${labelW - 10}" y="${y + rowH / 2}" class="gantt-label">${wp.id}</text>`;
+
+    // Bar
+    html += `<rect class="gantt-bar" x="${x1}" y="${y + 4}" width="${w}" height="${rowH - 8}" fill="${wp.color}" opacity="0.85"
+      data-id="${wp.id}" data-name="${wp.name}" data-desc="${wp.desc}" data-methods="${wp.methods}" data-period="M${wp.start}–M${wp.end}"/>`;
+
+    // WP name inside bar if wide enough
+    if (w > 100) {
+      html += `<text x="${x1 + 10}" y="${y + rowH / 2}" fill="white" font-size="11" font-weight="600" dominant-baseline="middle" pointer-events="none">${wp.id}</text>`;
+    }
+  });
+
+  // Milestone diamonds
+  milestones.forEach(ms => {
+    const mx = barLeft + (ms.month - 1) * monthW + monthW / 2;
+    const my = topPad + wps.length * rowH + 45;
+    const size = 8;
+
+    html += `<g class="milestone-diamond"
+      data-id="${ms.id}" data-name="${ms.label}" data-desc="${ms.desc}" data-period="Month ${ms.month}"
+      transform="translate(${mx}, ${my})">
+      <polygon points="0,${-size} ${size},0 0,${size} ${-size},0" fill="${ms.color}" opacity="0.9" stroke="white" stroke-width="1"/>
+      <text x="0" y="${size + 14}" class="milestone-label">${ms.id}: ${ms.label}</text>
+    </g>`;
+  });
+
+  svg.innerHTML = html;
+
+  // Tooltip events
+  svg.querySelectorAll('[data-id]').forEach(el => {
+    el.addEventListener('mouseenter', showTooltip);
+    el.addEventListener('mousemove', moveTooltip);
+    el.addEventListener('mouseleave', hideTooltip);
+  });
+}
+
+// ===== DEPENDENCY GRAPH =====
+function buildDepGraph() {
+  const svg = document.getElementById('dep-svg');
+  const W = 1200, H = 750;
+
+  // Position nodes in layers by phase
+  const positions = {};
+  // Phase 1 nodes (rows 0-5)
+  ['WP1','WP2','WP3','WP4'].forEach((id, i) => {
+    positions[id] = { x: 150 + (i % 2) * 180, y: 80 + Math.floor(i / 2) * 80 };
+  });
+  // Phase 2 nodes
+  ['WP5','WP6'].forEach((id, i) => {
+    positions[id] = { x: 400 + i * 180, y: 320 };
+  });
+  // Phase 3 nodes
+  ['WP7','WP8','WP9','WP10','WP11'].forEach((id, i) => {
+    positions[id] = { x: 400 + (i % 3) * 180, y: 520 + Math.floor(i / 3) * 70 };
+  });
+  // Milestones
+  ['M1','M2','M3','M4','M5','M6'].forEach((id, i) => {
+    const ms = milestones.find(m => m.id === id);
+    positions[id] = { x: 150 + (i % 3) * 300, y: 120 + Math.floor(i / 3) * 600 };
+  });
+
+  // Fix specific positions
+  positions.M1 = { x: 80, y: 100 };
+  positions.M2 = { x: 400, y: 100 };
+  positions.M3 = { x: 720, y: 100 };
+  positions.M4 = { x: 200, y: 440 };
+  positions.M5 = { x: 600, y: 700 };
+  positions.M6 = { x: 1000, y: 700 };
+
+  // Re-position phase groups properly
+  positions.WP1 = { x: 100, y: 100 };
+  positions.WP2 = { x: 300, y: 100 };
+  positions.WP3 = { x: 500, y: 100 };
+  positions.WP4 = { x: 700, y: 100 };
+  positions.WP5 = { x: 200, y: 320 };
+  positions.WP6 = { x: 450, y: 320 };
+  positions.WP7 = { x: 100, y: 520 };
+  positions.WP8 = { x: 350, y: 520 };
+  positions.WP9 = { x: 600, y: 520 };
+  positions.WP10 = { x: 100, y: 680 };
+  positions.WP11 = { x: 350, y: 680 };
+  positions.M1 = { x: 100, y: 75 };
+  positions.M2 = { x: 500, y: 75 };
+  positions.M3 = { x: 800, y: 75 };
+  positions.M4 = { x: 325, y: 440 };
+  positions.M5 = { x: 600, y: 680 };
+  positions.M6 = { x: 850, y: 700 };
+
+  const wpColors = {
+    WP1: '#ff6b6b', WP2: '#ffa94d', WP3: '#ffd43b', WP4: '#69db7c',
+    WP5: '#42a5f5', WP6: '#b197fc', WP7: '#f783ac', WP8: '#fcc419',
+    WP9: '#63e6be', WP10: '#74c0fc', WP11: '#e599f7'
+  };
+
+  let html = `<defs>
+    <marker id="arrowhead2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#555"/>
+    </marker>
+  </defs>`;
+
+  // Phase backgrounds
+  const phaseRects = [
+    { x: 50, y: 60, w: 850, h: 120, c: '#1e3a5f', l: 'Phase 1: Perception' },
+    { x: 150, y: 280, w: 400, h: 120, c: '#2d2a5e', l: 'Phase 2: Semantic' },
+    { x: 50, y: 480, w: 900, h: 240, c: '#1a3a2e', l: 'Phase 3: Integration' }
+  ];
+
+  phaseRects.forEach(p => {
+    html += `<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" fill="${p.c}" opacity="0.2" rx="12"/>`;
+    html += `<text x="${p.x + 12}" y="${p.y + 22}" fill="#888" font-size="12" font-weight="600">${p.l}</text>`;
+  });
+
+  // Edges
+  dependencies.forEach(dep => {
+    const from = positions[dep.from];
+    const to = positions[dep.to];
+    if (!from || !to) return;
+    const isMilestone = dep.from.startsWith('M') || dep.to.startsWith('M');
+    html += `<line x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}"
+      class="${isMilestone ? 'dep-edge-highlight' : 'dep-edge'}"
+      marker-end="url(#arrowhead2)" opacity="0.4"/>`;
+  });
+
+  // Nodes
+  Object.entries(positions).forEach(([id, pos]) => {
+    const isMile = id.startsWith('M');
+    const ms = milestones.find(m => m.id === id);
+    const wp = wps.find(w => w.id === id);
+    const color = isMile ? ms.color : wpColors[id];
+    const name = isMile ? ms.label : wp.name;
+    const shortName = isMile ? id : id;
+
+    const w = isMile ? 80 : 100;
+    const h = isMile ? 30 : 28;
+
+    html += `<g class="dep-node" data-id="${id}" data-name="${name}"
+      data-desc="${isMile ? ms.desc : wp.desc}"
+      data-methods="${wp ? wp.methods : ''}"
+      data-period="${isMile ? 'M' + ms.month : 'M' + wp.start + '–M' + wp.end}"
+      transform="translate(${pos.x}, ${pos.y})">
+      <rect class="dep-node-rect" x="${-w/2}" y="${-h/2}" width="${w}" height="${h}"
+        fill="${color}" fill-opacity="0.15" stroke="${color}" rx="6"/>
+      <text class="dep-node-label" x="0" y="1" fill="${color}" font-size="${isMile ? 12 : 11}">${shortName}</text>
+    </g>`;
+  });
+
+  svg.innerHTML = html;
+
+  svg.querySelectorAll('[data-id]').forEach(el => {
+    el.addEventListener('mouseenter', showTooltip);
+    el.addEventListener('mousemove', moveTooltip);
+    el.addEventListener('mouseleave', hideTooltip);
+  });
+}
+
+// ===== TIMELINE VIEW =====
+function buildTimeline() {
+  const items = [
+    { phase: 'Phase 1: Perception Foundation', title: 'WP1: Human Detection & Pose', desc: 'Detect humans and estimate poses/gestures in real-time using YOLOv11, MediaPipe, and ST-GCN.', deliverables: ['Deployed YOLOv11 baseline', 'Pose estimation with MediaPipe', 'Gesture recognition with ST-GCN'], months: 'M1–M3' },
+    { phase: 'Phase 1', title: 'WP2: Action Prediction', desc: 'Predict trajectories and actions using SlowFast and Social-LSTM.', deliverables: ['SlowFast action recognition', 'Social-LSTM trajectory prediction', 'Motion Transformer comparison'], months: 'M1–M4' },
+    { phase: 'Phase 1', title: 'WP3: Semantic Environment Analysis', desc: 'Detect objects and materials from RGB-D sensors.', deliverables: ['VoteNet/PointPillars 3D detection', 'Scene graph generation', 'Semantic map construction'], months: 'M3–M4' },
+    { phase: 'Phase 1', title: 'WP4: Continuous Multi-Object Tracking', desc: 'Maintain persistent IDs across cameras and time.', deliverables: ['ByteTrack deployment', 'DeepSORT comparison', 'Occlusion handling'], months: 'M1–M4' },
+    { phase: 'Phase 2: Semantic Layer', title: 'WP5: Initial Scene Interpretation', desc: 'Build structured scene representation with entities, relationships, and goals.', deliverables: ['Scene graph construction', 'Intent inference module', 'Novelty detection'], months: 'M5–M6' },
+    { phase: 'Phase 2', title: 'WP6: Human-Robot Interaction', desc: 'Analyze interaction quality between humans and robots.', deliverables: ['Interaction Transformer model', 'Trust evaluation pipeline', 'Cross-cultural validation'], months: 'M5–M6' },
+    { phase: 'Phase 3: Integration & Deployment', title: 'WP7: Robot Motion Planning', desc: 'Plan safe, efficient, socially-aware robot paths.', deliverables: ['DWA planner', 'APF implementation', 'MPC-based planner'], months: 'M7–M9' },
+    { phase: 'Phase 3', title: 'WP8: Trajectory Planning', desc: 'Generate socially-compliant motion trajectories.', deliverables: ['RRT* trajectory generation', 'Social force models', 'Comfort zone integration'], months: 'M7–M9' },
+    { phase: 'Phase 3', title: 'WP9: Control & Motion Generation', desc: 'Generate low-level control commands for planned motions.', deliverables: ['Trajectory optimization', 'Control barrier functions', 'Real-time execution'], months: 'M7–M9' },
+    { phase: 'Phase 3', title: 'WP10: Human-Aware Task Planning', desc: 'Plan robot tasks that respect human presence and intentions.', deliverables: ['PDDL classical planner', 'Intent-aware constraints', 'Human-in-the-loop planning'], months: 'M9–M10' },
+    { phase: 'Phase 3', title: 'WP11: Action Recommendation', desc: 'Recommend optimal robot actions based on full context.', deliverables: ['Multi-criteria scoring', 'Decision support engine', 'User feedback integration'], months: 'M9–M10' },
+  ];
+
+  const container = document.getElementById('timeline-container');
+  let html = '<div class="timeline-line"></div>';
+
+  items.forEach((item, i) => {
+    const side = i % 2 === 0 ? 'left' : 'right';
+    html += `<div class="timeline-item ${side}">
+      <div class="item-phase">${item.phase}</div>
+      <div class="item-title">${item.title}</div>
+      <div class="item-desc">${item.desc}</div>
+      <ul class="item-deliverables">
+        ${item.deliverables.map(d => `<li>${d}</li>`).join('')}
+      </ul>
+      <span class="item-months">${item.months}</span>
+    </div>`;
+  });
+
+  container.innerHTML = html;
+}
+
+// ===== TOOLTIP =====
+const tooltip = document.getElementById('tooltip');
+
+function showTooltip(e) {
+  const el = e.target.closest('[data-id]');
+  if (!el) return;
+  tooltip.querySelector('.tt-title').textContent = el.dataset.name || el.dataset.id;
+  tooltip.querySelector('.tt-desc').textContent = el.dataset.desc || '';
+  const meta = tooltip.querySelector('.tt-meta');
+  meta.innerHTML = `
+    ${el.dataset.period ? `<span>Period: <strong>${el.dataset.period}</strong></span>` : ''}
+    ${el.dataset.methods ? `<span>Methods: <strong>${el.dataset.methods}</strong></span>` : ''}
+  `;
+  tooltip.classList.add('visible');
+}
+
+function moveTooltip(e) {
+  tooltip.style.left = (e.clientX + 16) + 'px';
+  tooltip.style.top = (e.clientY + 16) + 'px';
+}
+
+function hideTooltip() {
+  tooltip.classList.remove('visible');
+}
+
+// ===== TAB SWITCHING =====
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ===== INIT =====
+buildGantt();
+buildDepGraph();
+buildTimeline();
+</script>
+</body>
+</html>
