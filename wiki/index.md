@@ -5,8 +5,8 @@ type: index
 
 # Wiki Index
 
-> Last updated: 2026-06-02 12:10
-> Total pages: 52 | Total sources: 1
+> Last updated: 2026-06-02 15:30
+> Total pages: 52 | Total sources: 9
 
 ## Entities
 | Name | Summary | Updated |
@@ -80,6 +80,17 @@ type: index
 | [scenario: Human Detection and Pose Estimation](validation/scenario-human-detection-pose.md) | Validate WP1 on workspace footage with ground truth | 2026-06-02 |
 | [scenario: Object Detection](validation/scenario-object-detection.md) | Validate WP3 methods for 3D detection from LiDAR/RGB-D | 2026-06-02 |
 | [scenario: Trajectory Prediction and Tracking](validation/scenario-traj-prediction.md) | Validate WP2/WP4 methods for prediction and tracking | 2026-06-02 |
+
+## Imported Resources from ENABLING Project
+| Name | Summary | Updated |
+|------|---------|---------|
+| [Automating 3D Dataset Generation with Neural Radiance Fields](../raw/articles/2025-04-29-Automating3DdetectionRadianceFields.md) | Automated pipeline using Radiance Fields for 3D dataset generation | 2026-06-02 |
+| [Real-Time Digital Twin of TIAGo: A Framework for Synchronized Human-Robot Interaction](../raw/articles/2025-10-05-real-time-digital-twin-tiago.md) | Framework for synchronized human-robot interaction through digital twin | 2026-06-02 |
+| [Synthetic Data Generation for Robotics: A Comprehensive Review](../raw/articles/2025-10-19-synthetic-dataset-generation-review.md) | Review of synthetic data generation techniques for robotics applications | 2026-06-02 |
+| [Intent Recognition in Speech-to-Text Processing in Cognitive Assistive Systems](../raw/articles/2026-05-11-intent-recognition-speech-to-text-cognitive-assistive-systems.md) | Speech-to-intent recognition for human-robot interaction in elderly-care | 2026-06-02 |
+| [Think Like a Team: Graph-Based Representation of Shared Mental Models](../raw/articles/2026-03-04-think-like-a-team-graph-based-shared-mental-models.md) | Temporal Shared Mental Model using TGNNs for human-agent collaboration | 2026-06-02 |
+| [Eye Contact Based Engagement Prediction for dyadic Human-Robot Interaction](../raw/articles/2025-04-28-EyeContactBasedEngagementForHRI.md) | Engagement prediction using eye contact detection in HRI | 2026-06-02 |
+| [Toward Truly Intelligent Autonomous Systems – A Taxonomy of Integrating LLMs into MBSE](../raw/articles/2025-04-28-TowardTrulyIntelligentAutonomousSystems.md) | Taxonomy for integrating LLMs into model-based systems engineering | 2026-06-02 |
 
 ## Drafts (temp/)
 | Name | Summary | Updated |

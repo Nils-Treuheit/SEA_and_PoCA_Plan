@@ -20,6 +20,8 @@ This reading list is designed to support the development of the **SEA (Semantic 
 *   **3D Object Detection:**
     *   *VoteNet:* Learning 3D object detection from point clouds.
     *   *PointNet / PointNet++:* The fundamental architectures for processing unstructured 3D data.
+    *   *PointPillars:* Learning 3D object detection from point cloud voxel stacks.
+    *   *Complex-YOLO:* Learning 3D object detection from point cloud representations from the BEV.
 *   **Semantic Segmentation:**
     *   *Mask R-CNN:* The foundation for instance segmentation in 2D and its projection into 3D.
 

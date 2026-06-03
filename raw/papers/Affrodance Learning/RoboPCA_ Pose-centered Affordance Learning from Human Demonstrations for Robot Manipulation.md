@@ -1,0 +1,296 @@
+---
+title: "RoboPCA: Pose-centered Affordance Learning from Human Demonstrations for Robot Manipulation"
+source: "https://arxiv.org/html/2603.07691v1"
+author:
+published:
+created: 2026-06-03
+description:
+tags:
+  - "clippings"
+---
+Zhanqi Xiao, Ruiping Wang and Xilin Chen \*This work is partially supported by Beijing Municipal Natural Science Foundation Nos. L257009, L242025, and Natural Science Foundation of China under contracts Nos. 62495082, 62461160331.The authors are with the Key Laboratory of AI Safety of CAS, Institute of Computing Technology, Chinese Academy of Sciences (CAS), Beijing, 100190, China, and also with the University of Chinese Academy of Sciences, Beijing 100049, China. {zhanqi.xiao}@vipl.ict.ac.cn, {wangruiping,xlchen}@ict.ac.cnCorresponding author: Ruiping Wang.
+
+###### Abstract
+
+Understanding spatial affordances—comprising the contact regions of object interaction and the corresponding contact poses—is essential for robots to effectively manipulate objects and accomplish diverse tasks. However, existing spatial affordance prediction methods mainly focus on locating the contact regions while delegating the pose to independent pose estimation approaches, which can lead to task failures due to inconsistencies between predicted contact regions and candidate poses. In this work, we propose RoboPCA, a pose-centered affordance prediction framework that jointly predicts task-appropriate contact regions and poses conditioned on instructions. To enable scalable data collection for pose-centered affordance learning, we devise Human2Afford, a data curation pipeline that automatically recovers scene-level 3D information and infers pose-centered affordance annotations from human demonstrations. With Human2Afford, scene depth and the interaction object’s mask are extracted to provide 3D context and object localization, while pose-centered affordance annotations are obtained by tracking object points within the contact region and analyzing hand–object interaction patterns to establish a mapping from the 3D hand mesh to the robot end-effector orientation. By integrating geometry–appearance cues through an RGB-D encoder and incorporating mask-enhanced features to emphasize task-relevant object regions into the diffusion-based framework, RoboPCA outperforms baseline methods on image datasets, simulation, and real robots, and exhibits strong generalization across tasks and categories.
+
+## I INTRODUCTION
+
+![Refer to caption](https://arxiv.org/html/2603.07691v1/x1.png)
+
+Figure 1: Overview of our pipeline. (a) Pose-centered affordance annotations and complementary scene information are extracted from human demonstrations with Human2Afford for pose-centered affordance learning. (b) RoboPCA builds upon a diffusion framework to predict pose-centered affordances, an RGB-D encoder is used to effectively capture both geometry and appearance cues, and mask-enhanced features are incorporated to emphasize task-relevant object regions. (c) The predicted pose-centered affordances are transformed into 6-DoF poses using camera parameters, guiding the robot to complete the task.
+
+Humans excel at manipulating various objects in unstructured environments, including locating task-related interaction regions and selecting appropriate contact poses. This ability is largely ascribed to the profound understanding of spatial affordances [^13] [^14]. As robots and humans operate in the same workspace, a comprehensive understanding of spatial affordances is crucial for enhancing robotic manipulation capabilities across diverse object categories and tasks.
+
+Affordance had already been extensively studied before its application to robotic manipulation, which is often represented as masks or heatmaps [^35] [^41] [^30]. While such representation can indicate potential interaction regions on objects, it lacks the precise spatial localization required for accurate robot manipulation. To address this, recent works propose representing affordances in terms of contact points and post-contact trajectories [^1]. In this representation, the interaction region is denoted by a 2D pixel to specify where the robot should make contact with the object, while the post-contact trajectories are represented by a 2D vector on the image to indicate the direction and movement the robot should execute after making contact. Building on this representation, subsequent works have made many improvements, such as introducing object retrieval or leveraging the reasoning capability of foundation models for generalization across categories [^20] [^24] [^26] [^48] [^31]. However, contact points and post-contact trajectories alone do not specify the manipulator pose for task execution. Although the final pose could be obtained by filtering the grasp candidates from independent pose estimation approaches [^11] [^40] based on the predicted contact point, the inconsistency between predicted contact points and grasp candidates may lead to suboptimal or even failed executions. We argue pose-centered affordances, represented jointly by the contact points and the corresponding contact poses, provide a more coherent and expressive formulation for robotic manipulation. By unifying contact localization and pose estimation, this formulation reduces the inconsistency between predicted contact points and grasp candidates and provides a principled basis for generating reliable manipulation strategies.
+
+Similar to other tasks in robot learning, learning pose-centered affordances that support the manipulation of arbitrary objects requires large-scale data. While recent works, such as DROID [^22], have gathered large-scale robotic demonstrations via human teleoperation, this approach remains difficult to scale to new environments or task demands. In contrast, human demonstrations provide a promising data source, not only due to the scale and diversity of scenes and tasks, but also because they naturally capture dynamics relevant to object interactions. Nevertheless, the absence of 3D information and low-level action labels limits their utility for pose-centered affordance learning, particularly for extracting contact poses.
+
+In this work, we aim to enable pose-centered affordance learning from a large amount of unlabeled human demonstrations, tackling two key questions: (1) How can pose-centered affordances be extracted from unlabeled human demonstrations? (2) How to effectively learn pose-centered affordances from collected datasets? To answer the first question, we devise Human2Afford, a data curation pipeline that automatically recovers scene-level 3D information and extracts pose-centered affordances from human demonstrations. With each identified pre-contact frame and contact frame pair, Human2Afford first recovers the depth information and extracts the interaction object’s mask in the pre-contact frame to provide 3D context and object localization to facilitate pose-centered affordance learning. To obtain pose-centered affordance annotations, we first recover the contact pose by analyzing the hand–object interaction patterns to establish a mapping between the estimated 3D hand mesh in the contact frame and the robot end-effector’s orientation, and then derive the contact point by tracking object pixels within the contact region in the contact frame back to the pre-contact frame. We collected 10K human–object interaction images with pose-centered affordance annotations and complementary scene information using Human2Afford. Based on the collected dataset, we propose RoboPCA for the second question, which is a Pose-Centered Affordance prediction framework that jointly predicts task-appropriate contact point and corresponding contact pose given instructions. RoboPCA builds upon a diffusion framework to predict pose-centered affordances. To effectively capture both geometry and appearance cues, it leverages a state-of-the-art RGB-D encoder [^47] that integrates color and depth information. Additionally, mask-enhanced features are incorporated to emphasize task-relevant object regions, improving the model’s ability to localize interaction points and accurately infer corresponding contact poses. The overview of our pipeline is shown in Fig. 1.
+
+We evaluate RoboPCA through extensive experiments on image datasets, simulation, and real-world scenarios. It outperforms baseline methods in contact point prediction precision and manipulation task success rates, achieving improvements of 18.6% on AGD20K [^29] evaluated on object categories feasible for robotic manipulation, 38.5% on RLBench [^18], and 24.9% in real-world experiments, which demonstrates that RoboPCA not only achieves higher precision in predicting contact points but also provides more reliable and effective guidance for manipulation tasks. We also demonstrate its compatibility with robotic data.
+
+## II RELATED WORK
+
+![Refer to caption](https://arxiv.org/html/2603.07691v1/x2.png)
+
+Figure 2: Overview of Human2Afford. (a) Given a human demonstration, we identify the demo description and extract key frames using a hand–object detector and VLMs. Depth and the interaction object mask are then obtained via metric depth estimation and segmentation. (b) Using the 3D hand mesh from a hand pose estimator, we extract the contact pose based on the inter-finger vector and palm normal. (c) Object points are tracked from the pre-contact to the contact frame, and points within the inter-finger contact region are modeled with GMM to extract the contact point.
+
+### II-A Visual Affordance Learning
+
+Affordance focuses on determining where and how to interact with diverse objects based on the visual inputs and instructions. One line of work learns affordances from annotated datasets [^9] [^10], which is often prohibitively expensive. To alleviate the labeling cost, some studies learn affordances by exploring effective interaction in simulated environments [^12] [^32]; however, acquiring diverse virtual assets also incurs substantial cost. Others leverage large-scale models to automatically annotate contact regions [^41] [^30], but these annotations are typically performed on single-frame images or static assets and thus fail to capture the dynamic information about how to interact with objects.
+
+In contrast, human demonstrations have gained increasing attention as a more general source for affordance learning, as they naturally encode interaction dynamics and are abundantly available online, offering rich scene and task diversity. Building upon this formulation proposed by [^1], which represents affordance as contact points and post-contact trajectories by a 2D pixel and a 2D vector on the image, object retrieval has been employed to enable cross-category transfer [^20] [^24], and knowledge from large-scale models has been leveraged to enhance the robustness of contact point prediction [^26] [^48] [^31]. With respect to post-contact trajectories, recent studies have extended the 2D vector representation into point-based trajectories to capture curved or non-linear motions that cannot be expressed in a single vector, thereby offering a more faithful description of complex interaction dynamics [^6] [^46]. However, these approaches require an independent pose estimation module to generate the final contact pose by filtering, which could lead to suboptimal or failed execution due to inconsistencies between predicted contact points and grasp candidates. In contrast, our model jointly predicts contact points and corresponding poses to provide a more consistent representation for robot manipulation.
+
+### II-B Robot Learning from Humans
+
+Human demonstrations offer a natural and abundant source of supervision for robotic learning, as they inherently capture the dynamics of interaction. With the availability of large-scale video datasets [^28] [^8] [^16], recent studies have explored utilizing human videos to facilitate robot learning. One line of approaches learns visual representations from human videos and leverages the pre-trained visual encoders to facilitate policy network training [^33] [^45] [^3] [^39]. Another line of research focuses on learning reward functions from human videos [^5] [^4] [^38]. Additionally, some works leverage the motion attributes extracted from human videos, such as wrist trajectories or 3D hand poses, to guide policy learning or to serve as intermediate supervision for manipulation tasks [^43] [^2] [^15]. Building upon these directions, affordance provides an explicit and interpretable representation that can naturally transfer from human to robot embodiment. In this work, our model provides a principled basis for generating reliable, context-aware manipulation strategies through learning pose-centered affordances that jointly predict contact points and contact poses directly from human demonstrations.
+
+### II-C Diffusion Models in Robotics
+
+Diffusion models have emerged as a powerful paradigm for modeling complex data distributions through iterative denoising, and have also demonstrated strong potential in robotic learning as effective frameworks for policy learning [^19] [^7] [^49] [^21] [^25]. Diffusion Policy [^7] provides a general framework for generating robot action trajectories via a conditional denoising diffusion process. Building on this, subsequent works have explored enhancing trajectory generation by incorporating reward signals to guide the denoising process [^19], while other approaches adopt a more factorized policy learning framework that unifies action keypose prediction and trajectory diffusion generation for learning robot manipulation from demonstrations [^21] [^25]. However, these approaches often suffer from limited generalization ability, making it difficult to transfer across diverse objects and environments. Instead of predicting full trajectories, our model uses diffusion models for pose-centered affordance learning. Conditioned on 3D scenes’ information and instructions, it jointly generates contact points and poses that generalize across diverse tasks and object types.
+
+## III METHOD
+
+### III-A Problem Formulation
+
+We aim to learn a pose-centered affordance prediction model $\mathbf{a}=\pi(\{\tilde{I},\tilde{D}\},l,\tilde{M})$ from human demonstrations, where $\{\tilde{I},\tilde{D}\}$ denotes an RGB-D frame (with image $\tilde{I}$ and depth $\tilde{D}$), $l$ represents the language instruction and $\tilde{M}$ is the target object’s mask relevant to the instruction. The depth frame could be obtained either from a depth sensor or a metric-depth estimation foundation model [^17], and the target object mask can be easily acquired through integrating an open-vocabulary object detection method [^27] and segmentation foundation models [^36]. We formulate the pose-centered affordance representation $\mathbf{a}$ in terms of contact points $\mathbf{c}$, represented as 2D points in pixel space, and end-effector orientations R, represented as quaternions in 3D space relative to the camera coordinate frame. Specifically, $\mathbf{a}=\{\mathbf{c},\mathbf{R}\}$, where $\mathbf{c}=(u,v)$ and $\mathbf{R}=(w,x_{\mathbf{R}},y_{\mathbf{R}},z_{\mathbf{R}})$, with $(w,x_{\mathbf{R}},y_{\mathbf{R}},z_{\mathbf{R}})$ denoting the quaternion components. Using the camera intrinsic parameters $\mathbf{K}=(f_{x},f_{y},c_{x},c_{y})$ and the depth value $\tilde{D}_{u,v}$ at pixel $(u,v)$, the 3D contact position $\mathbf{p}=(x,y,z)$ can be computed as:
+
+$$
+\begin{gathered}z=\tilde{D}_{u,v},\quad x=(u-c_{x})\cdot\frac{z}{f_{x}},\quad y=(v-c_{y})\cdot\frac{z}{f_{y}}.\end{gathered}
+$$
+
+The final 6-DoF pose, which the robot uses to interact with the target object under the given instruction, is then represented as $\mathbf{\tau}=(\mathbf{p},\mathbf{R})=(x,y,z,w,x_{\mathbf{R}},y_{\mathbf{R}},z_{\mathbf{R}}).$ To enhance clarity in subsequent discussions, we will use $\mathbf{R}$ to directly represent the contact pose.
+
+### III-B Pose-centered Affordance Extraction from Human Videos
+
+Human videos are often captured with moving monocular cameras, where the camera pose and depth per frame are unknown. The absence of low-level action labels and 3D scene information impedes robots from acquiring manipulation skills directly from human demonstrations. To enable learning pose-centered affordances from human videos, we devise Human2Afford that automatically recovers scene-level 3D information and extracts pose-centered affordances from human demonstrations, as shown in Fig. 2. Here, we introduce the key components in our data curation pipeline.
+
+Data Preparation. Given a video clip $V$ consisting of $T$ frames i.e. $V=\{I_{1},\dots,I_{T}\}$, depicting human–object interactions (e.g., a person picking up a cup), we first prompt a vision-language model (VLM), specifically Gemini-2.0-Flash [^42], to identify the action depicted and the category of the interacting object. To extract pose-centric affordances from human videos, we first identify the contact frame where the interaction occurs and the pre-contact frame where the target object remains unoccluded. We utilize a widely-adopted hand-object interaction detector [^37] to identify the interaction state in each frame and obtain the corresponding hand bounding boxes. Since significant changes in camera pose between the pre-contact frame and the contact frame can hinder 3D pose recovery due to the lack of camera parameter labels, we further leverage Gemini to examine frames around the critical interval of interaction state changes, filtering out false positives and selecting contact and pre-contact frames $\{I_{c},I_{p}\}$ that are temporally close to satisfy the viewpoint consistency requirement. We then employ a metric-depth foundation model [^17] to recover the depth $\hat{D}$ of $I_{p}$, and use GroundingDINO [^27] and SAM2 [^36], guided by hand bounding box priors, to obtain the interacting object’s mask in $I_{c}$, which is then projected back onto $I_{p}$, denoted as $\hat{M}$.
+
+Contact Pose Recovery. Under the assumption that there is no significant change in camera pose between $I_{p}$ and the $I_{c}$, we first leverage a 3D hand pose estimator [^34] to estimate the hand pose in $I_{c}$. With the hand mesh given by [^34], we propose a heuristic method that establishes a mapping from the recovered human hand pose to the robot end-effector orientation. Since human-object interactions predominantly involve the thumb, index, and middle fingers, we identify the finger pair that primarily applies force to the object by jointly analyzing the inter-finger mesh distances and their spatial relationships with the object mask $\hat{M}$. Based on the inter-finger vector of the selected finger pair $\hat{\mathbf{v}}_{fp}$ and the averaged normal vector of the palm region $\hat{\mathbf{n}}_{palm}$, we recover the robot contact pose $\mathbf{R}_{c}$ from the human hand pose, here $\mathbf{R}_{c}$ is aligned with the orientation $\mathbf{R}$ in the $I_{p}$, denoted as:
+
+$$
+\mathbf{R}=\mathbf{R}_{c}=\mathcal{F}(\hat{\mathbf{v}}_{fp},\hat{\mathbf{n}}_{palm}).
+$$
+
+Contact Point Extraction. To extract the contact point $c$, we employ SpaTracker [^44], an off-the-shelf dynamic point tracker, to automatically track the interaction object from $I_{p}$ to $I_{c}$, providing temporally consistent object localization even under occlusion. We then analyze the overlap between the object points and the hand mesh to identify points within the area formed by the thumb, index, and middle fingers in $I_{c}$. These points are back-projected to $I_{p}$, denotes as $\{\mathbf{c}_{i}\}^{N}$. Treating $p(\mathbf{c})$ as the distribution over $\{\mathbf{c}_{i}\}^{N}$, we fit a Gaussian mixture model (GMM) with parameters $(\mathbf{\mu}_{k},\mathbf{\sigma}_{k})$ by maximizing the likelihood over all $\mathbf{c}_{i}$:
+
+$$
+p(\mathbf{c})=\mathop{argmax}\limits_{\mathbf{\mu}_{1},...,\mathbf{\mu}_{K},\mathbf{\sigma}_{1},....\mathbf{\sigma}_{K}}\sum\limits_{i=1}^{N}\sum\limits_{k=1}^{K}\,\mathcal{N}(\mathbf{c}_{i}\mid\mathbf{\mu}_{k},\mathbf{\sigma}_{k}).
+$$
+
+The final contact point in $I_{p}$ is represented as the average of the Gaussian means:
+
+$$
+\mathbf{c}=\frac{1}{K}\sum\limits_{k=1}^{K}\ \mathbf{\mu}_{k}
+$$
+
+### III-C Pose-centered Affordance Learning
+
+RoboPCA is trained as a conditional diffusion probabilistic model to infer pose-centered affordance $\mathbf{a}=\{\mathbf{c},\mathbf{R}\}$ given the RGB-D frame of the scene $\{\tilde{I},\tilde{D}\}$, target object mask $\hat{M}$, and a language instruction $l$ through iterative denoising process. We represent rotations $\mathbf{R}$ using the 6D rotation representation of [^50] to avoid the discontinuities of the quaternion representation. A variance schedule $\{\beta_{i}\in(0,1)\}_{i=1}^{N}$ is associated with the diffusion process, which defines how much noise is added at each diffusion step. Given a sample $\mathbf{a}_{0}$, the noise version of $\mathbf{a}_{0}$ at step i can be written as $\mathbf{a}_{i}=\sqrt{\bar{\alpha}_{i}}\mathbf{a}_{0}+\sqrt{1-\bar{\alpha}_{i}}\mathbf{\epsilon}$, where $\mathbf{\epsilon}\sim\mathcal{N}(0,1)$ is a sample noise from a Gaussian distribution with the same dimension as $\mathbf{a}_{0}$, $\bar{\alpha_{i}}=\prod\limits_{j=1}^{i}\alpha_{i}$ and $\alpha_{i}=1-\beta_{i}$.
+
+RoboPCA models a learned gradient of the denoising process with a denoising transformer $\hat{\mathbf{\epsilon}}=\mathbf{\epsilon}_{\theta}(\mathbf{a}_{i};i,\{\tilde{I},\tilde{D}\},l,\tilde{M})$ that takes the noisy pose-centered affordance $\mathbf{a}_{i}$, diffusion step $i$, and conditioning information from the RGB-D frame of current scene $\{\tilde{I},\tilde{D}\}$, object mask $\tilde{M}$ and language instruction $l$ as input, to predict the noise component $\hat{\mathbf{\epsilon}}$.
+
+At each diffusion step i, we convert the visual observation of the scene $\{\tilde{I},\tilde{D}\}$ and noised pose-centered affordance estimate $\mathbf{a}_{i}$ to a set of tokens, where each token is represented as a latent embedding and a position in pixel coordinates. Since human demonstrations lack camera pose annotations, we incorporate geometric information, which is crucial for affordance understanding, by leveraging a state-of-the-art RGB-D encoder [^47] to encode each RGB-D frame. Moreover, with the object mask $\tilde{M}$, we deploy the same encoder to the masked RGB-D frame to enhance the model’s perception of task-relevant object regions. The features from both the full and masked frames are then concatenated to obtain the mask-enhanced features of the scene. The noisy estimate $\mathbf{a}_{i}$ of the clean pose-centered affordance $\mathbf{a}_{0}$ is transferred to a latent embedding vector with an MLP, and the language task instruction is mapped to language tokens using a pre-trained CLIP language encoder. We fuse tokens of scene and $\mathbf{a}_{i}$ by applying relative self-attentions among all tokens, and additionally fuse language tokens using cross-attentions to get the final conditional tokens. We use the rotary positional embeddings [^23] to encode relative positional information in attention layers. The conditional tokens is then fed into MLPs to predict the noise $\mathbf{\epsilon}_{\theta}^{loc}(\{\tilde{I},\tilde{D}\},\tilde{M},l,\mathbf{a}_{i},i)$ and $\mathbf{\epsilon}_{\theta}^{rot}(\{\tilde{I},\tilde{D}\},\tilde{M},l,\mathbf{a}_{i},i)$ added to $\mathbf{a}_{0}$ ’s contact point $\mathbf{c}_{0}$ and contact pose $\mathbf{R}_{0}$.
+
+During training stage, we randomly sample a diffusion step $i$ and add noise $\mathbf{\epsilon}=(\mathbf{\epsilon}^{loc},\mathbf{\epsilon}^{rot})$ to ground truth pose-centered affordance $\mathbf{a}_{0}=(\mathbf{c}_{0},\mathbf{R}_{0})$. We use L1 loss for the prediction of $\mathbf{\epsilon}$. The objective loss of the denoising transformer $\mathcal{L}_{\theta}$ can be expressed as (5), where $\omega_{1}$ and $\omega_{2}$ are hyperparameters controlling the relative weights of $\mathcal{L}_{\theta}^{loc}$ and $\mathcal{L}_{\theta}^{rot}$.
+
+$$
+\begin{split}\mathcal{L}_{\theta}^{loc}&=\|\epsilon_{\theta}^{loc}(\{\tilde{I},\tilde{D}\},\tilde{M},l,\mathbf{a}_{i},i)-\epsilon^{loc}\|,\\
+\mathcal{L}_{\theta}^{rot}&=\|\epsilon_{\theta}^{rot}(\{\tilde{I},\tilde{D}\},\tilde{M},l,\mathbf{a}_{i},i)-\epsilon^{rot}\|,\\
+\mathcal{L}_{\theta}&=\omega_{1}\cdot\mathcal{L}_{\theta}^{loc}+\omega_{2}\cdot\mathcal{L}_{\theta}^{rot}.\end{split}
+$$
+
+During inference, a sample $\mathbf{a}_{N}\sim\mathcal{N}(0,1)$ is first drawn. The predicted contact point $\hat{\mathbf{c}}$ and contact pose $\hat{\mathbf{R}}$ are obtained through progressively denoising the sample $N$ times with $\epsilon_{\theta}$, following (6), where $\mathbf{z}\sim\mathcal{N}(0,1)$ is a random variable of appropriate dimension. Scaled-linear and square cosine scheduler are used for $\mathbf{c}$ and $\mathbf{R}$ seperately to achieves better performance [^21].
+
+$$
+\mathbf{a}_{i-1}=\frac{1}{\sqrt{\alpha_{i}}}\left(\mathbf{a}_{i}-\frac{\beta_{i}}{\sqrt{1-\bar{\alpha}_{i}}}\epsilon_{\theta}(\{\tilde{I},\tilde{D}\},\tilde{M},l,\mathbf{a}_{i},i)\right)+\frac{1-\bar{\alpha}_{i+1}}{1-\bar{\alpha}_{i}}\beta_{i}\mathbf{z}
+$$
+
+## IV EXPERIMENTS
+
+![Refer to caption](https://arxiv.org/html/2603.07691v1/x3.png)
+
+Figure 3: Qualitative results on AGD20K. The label ⋆ \\star indicate the predicted contact points of different methods.
+
+To verify the effectiveness of the RoboPCA, we conduct extensive experiments in three perspectives: image-based affordance localization reasoning (Sec. IV-A), zero-shot manipulation in simulation (Sec. IV-B)) and in real-world settings (Sec. IV-C) as shown in Fig. 4 and further conduct an ablation study on the effectiveness of mask-enhanced features, joint pose-centered learning, and compatibility with robot data for further validation (Sec. IV-D).
+
+We compare our method against four baselines, namely VRB [^1], RAM [^24], MOKA [^26], and RoboPoint [^48], which represent training-based, retrieve-and-transfer and VLM-based approaches respectively. As none of the baseline methods predict the manipulation pose directly, we utilize AnyGrasp [^11] to produce grasp proposals and filter the final pose based on the contact point predicted by baselines as in [^24]. A rule-based mechanism is incorporated to avoid collisions with objects for our method accordingly. For manipulation tasks, prescribed post-contact waypoints are provided to facilitate task completion. The depth and object masks used for evaluation are obtained using the same pipeline as stated in Sec. III-B, if unavailable.
+
+TABLE I: Evaluation results on AGD20K dataset.
+
+| Models | SR $\uparrow$ | NSS $\uparrow$ | DTM $\downarrow$ |
+| --- | --- | --- | --- |
+| RAM [^24] | 0.1824 | 0.1892 | 0.0689 |
+| RoboPoint [^48] | 0.2138 | 0.2188 | 0.0508 |
+| VRB [^1] | 0.2846 | 0.2557 | 0.2069 |
+| MOKA [^26] | 0.3711 | 0.3390 | 0.0331 |
+| RoboPCA (ours) | 0.4403 | 0.4083 | 0.0445 |
+
+### IV-A Image-Based Affordance Localization Reasoning
+
+To evaluate the precision of contact point localization, we conduct experiments on AGD20K [^29] datasets. Following [^20], we select all the objects that are feasible for robotic manipulation and supplemented instances of drawer and cupboard categories following the same labeling procedure for comprehensive evaluation. Three metrics are reported for evaluation, including Success Rate (SR), Normalized Scanpath Saliency (NSS), and Distance to Mask (DTM).
+
+As shown in Tab. I, RoboPCA achieves a high success rate of 44.03%, which is 18.6% higher than the second-best method, MOKA, which leverages the strong reasoning capabilities of VLMs. This demonstrates the effectiveness of our method in localizing the appropriate contact point across categories, as shown in Fig. 3. Besides, RoboPCA also achieves higher NSS and similarly low DTM compared to MOKA, indicating that the predicted contact points are closer to the centers of the ground-truth masks.
+
+### IV-B Zero-shot Generalization across Tasks in Simulation
+
+![Refer to caption](https://arxiv.org/html/2603.07691v1/x4.png)
+
+Figure 4: Examples of task settings in simulation and the real world. We evaluate our method on 10 tasks in simulation (a; only 6 shown), and 9 tasks in the real world (b; only 6 shown) across various object categories to validate its effectiveness.
+
+To evaluate the zero-shot generalization of RoboPCA across tasks, we evaluate the task success rates on RLBench [^18]. 10 representative tasks from RLBench are selected as the evaluation set, including common object grasping, manipulation of task-relevant object regions, and articulated objects. Before evaluation, the manipulation regions of target objects are ensured to be fully visible by adjusting the camera viewpoint. Each task is evaluated with 25 episodes scored either 0 or 100, indicating failure or success in task execution. We report the average success rate for each task. The entire evaluation follows the testing pipeline of the modular approach as in [^26], the task is first decomposed into a sequence of subtasks aligned with the robot’s meta-skills, based on the given task instruction and visual input. Each subtask is then executed by its corresponding module to generate action trajectories. We replace the contact-relevant meta-skill modules with affordance models to evaluate whether the 6-DoF pose predicted by the affordance model could support successful task execution.
+
+As shown in Tab. II, our method outperforms all baselines on most of the tasks, yielding an average success rate of 64.8%. Compared to our method, RoboPoint and VRB suffer from providing precise contact points for manipulation, leading to suboptimal performance on tasks, such as WaterPlants, which need to locate the contact point precisely on the handle of the watering can. RAM struggles to infer affordances for objects with diverse attributes (e.g., appearance), as its retrieval mechanism relies on object-level similarity within the affordance memory. Although MOKA achieves the second-best performance by leveraging the strong reasoning capabilities of VLMs, its performance is limited by AnyGrasp’s capability to generate grasp proposals in cluttered environments and under varying viewpoints. Moreover, the inherent randomness in VLMs’ outputs can lead to failures in tasks that require highly consistent action patterns, such as StackBlocks. In contrast, our method achieves higher consistency between the predicted contact points and contact poses by jointly learning pose-centered affordances. Furthermore, by incorporating geometric features, it supports cross-category transfer and generalizes to objects with diverse shapes and appearances beyond the training categories.
+
+TABLE II: Success rate (%) on RLBench Multi-Task setting.
+
+| Models | Pick Cup | Stack Blocks | Take Umbrella | Water Plants | Sweep Dirt | Close Laptop | Open Drawer | Close Drawer | Open Microwave | Close Microwave | Avg. |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| RoboPoint [^48] | 84 | 4 | 24 | 12 | 44 | 36 | 24 | 56 | 4 | 72 | 36.0 |
+| VRB [^1] | 84 | 60 | 32 | 4 | 48 | 44 | 20 | 84 | 8 | 64 | 44.8 |
+| RAM [^24] | 84 | 40 | 40 | 36 | 64 | 44 | 16 | 60 | 8 | 60 | 45.2 |
+| MOKA [^26] | 84 | 36 | 32 | 20 | 48 | 52 | 28 | 88 | 8 | 72 | 46.8 |
+| RoboPCA (ours) | 88 | 72 | 88 | 44 | 68 | 52 | 36 | 84 | 32 | 84 | 64.8 |
+
+![Refer to caption](https://arxiv.org/html/2603.07691v1/x5.png)
+
+Figure 5: Qualitative comparison of our model’s predicted contact points and poses with MOKA in real-world settings.
+
+### IV-C Real-World Experiments
+
+In the real-world setting, we carefully design 9 tasks involving interactions with diverse household objects, encompassing articulated objects (e.g., drawers), objects with function-specific regions (e.g., drumsticks), and deformable objects (e.g., cloth). We employ a Franka Emika robotic arm with a parallel gripper and utilize an on-hand RealSense D435i camera to capture the RGB-D image of the scene. We conduct 10 trials for each task, under different spatial arrangements and with varying object instances, to validate the generalization capability across tasks and categories.
+
+As shown in Tab. III, RoboPCA achieves an 83.3% success rate on average among all 9 tasks, 24.9% higher than the second-best method, RAM, which yields conclusions consistent with the experimental results on the simulation platform. Although the strong real-world grasp generation performance of AnyGrasp enables baseline methods to accomplish some pick-and-place tasks even with inaccurate contact point predictions, they struggle to support tasks that require precise prediction of contact point within task-specific regions (e.g., PlayDrum). Some qualitative results are provided in Fig. 5 to further illustrate the results.
+
+TABLE III: Success rate (%) on 9 tasks in Real-world setting.
+
+| Models | Put Into | Tidy Table | Pour Water | Shake Bell | Play Drum | Open Drawer | Close Drawer | Open Microwave | Close Microwave | Avg. |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| MOKA [^26] | 90 | 100 | 80 | 50 | 60 | 50 | 70 | 10 | 80 | 65.6 |
+| RAM [^24] | 100 | 80 | 60 | 50 | 30 | 70 | 70 | 60 | 80 | 66.7 |
+| RoboPCA (ours) | 100 | 90 | 70 | 80 | 100 | 70 | 80 | 60 | 100 | 83.3 |
+
+### IV-D Ablation Study
+
+As in Tab. IV, we conduct detailed ablation experiments on a subset of manipulation tasks on RLBench, which consist of articulated object and function-specific region manipulation. These tasks are selected as they are more representative of evaluating how effectively the predicted pose-centered affordances support tasks that require precise manipulation of function-specific object regions. Each task is evaluated with 25 episodes under the same settings as in Sec. IV-B.
+
+TABLE IV: Ablation results on 5 representative tasks evaluated on success rate (%). AT01: SweepDirt, AT02: OpenDrawer, AT03: CloseDrawer, AT04: OpenMicrowave, AT05: CloseMicrowave.
+
+| Models | AT01 | AT02 | AT03 | AT04 | AT05 | Avg. |
+| --- | --- | --- | --- | --- | --- | --- |
+| RoboPCA (ours) | 68 | 36 | 84 | 32 | 84 | 60.8 |
+| w/ robot data | 60 | 36 | 92 | 40 | 96 | 64.8 |
+| w/ AnyGrasp | 60 | 16 | 92 | 8 | 72 | 49.6 |
+| w/o masked features | 12 | 0 | 96 | 28 | 80 | 43.2 |
+
+Effectiveness of mask-enhanced features. We compare our model trained with and without mask-enhanced features. For the model without mask-enhanced features, the RGB-D encoder encodes tokens from the original RGB-D frame directly to represent the scene, which allows us to evaluate the effectiveness of mask-enhanced features on the model’s performance in capturing task-relevant object regions. As shown in the last row of Tab. IV, the success rate decreases markedly, especially for tasks requiring precise contact point predictions, such as OpenDrawer, which underscores the importance of incorporating mask-enhanced features for accurate pose-centered affordance prediction.
+
+Effectiveness of joint pose-centered learning. To further evaluate the effectiveness of the pose-centered affordance learning paradigm, which jointly predicts contact points and contact poses, we compare our model with and without AnyGrasp. For the model with AnyGrasp, we replace the output of 6-DoF pose with the grasp pose obtained by filtering the grasp proposals generated by AnyGrasp based on the predicted contact point from our model. As shown in the third row of Tab. IV, the performance of our model outperforms the model with AnyGrasp, which demonstrates the advantage of jointly learning contact points and poses for producing reliable and consistent manipulation actions.
+
+Compatibility with robot data. Beyond training only on human demonstrations, we also investigate whether RoboPCA can leverage robot demonstrations to further improve the performance of pose-centered affordance prediction. We collect 2K data samples based on DROID [^22] for evaluation, each comprising an RGB-D frame, the interacting object mask, the contact point, and the corresponding contact pose. As shown in the second row of Tab. IV, incorporating robot data improves performance among most of the tasks, demonstrating that RoboPCA is compatible with robot demonstrations and can effectively benefit from additional robotic experience.
+
+## V CONCLUSION AND FUTURE WORK
+
+In this work, we propose RoboPCA, a pose-centered affordance prediction model that jointly predicts the contact points and poses given task instructions. To reduce collection costs, we devise Human2Afford, which automatically recovers scene-level 3D information and extracts pose-centered affordances from unlabeled human demonstrations. Extensive experiments show that RoboPCA achieves higher accuracy in contact point prediction, stronger consistency between contact points and manipulation poses, and generalization across tasks and categories. Ablation studies further validate the effectiveness of mask-enhanced features, the pose-centered affordance learning paradigm, and compatibility with robot data. Future work will extend our approach to cross-embodiment and larger datasets, enabling more versatile, robust manipulation across diverse objects and scenarios.
+
+[^1]: S. Bahl, R. Mendonca, L. Chen, U. Jain, and D. Pathak (2023) Affordances from human videos as a versatile representation for robotics. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, Cited by: §I, §II-A, TABLE I, TABLE II, §IV.
+
+[^2]: H. Bharadhwaj, D. Dwibedi, A. Gupta, S. Tulsiani, C. Doersch, T. Xiao, D. Shah, F. Xia, D. Sadigh, and S. Kirmani (2024) Gen2act: human video generation in novel scenarios enables generalizable robot manipulation. arXiv preprint arXiv:2409.16283. Cited by: §II-B.
+
+[^3]: H. Bharadhwaj, A. Gupta, V. Kumar, and S. Tulsiani (2024) Towards generalizable zero-shot manipulation via translating human interaction plans. In 2024 IEEE International Conference on Robotics and Automation (ICRA), Cited by: §II-B.
+
+[^4]: M. Chang, A. Prakash, and S. Gupta (2023) Look ma, no hands! agent-environment factorization of egocentric videos. Advances in Neural Information Processing Systems. Cited by: §II-B.
+
+[^5]: A. S. Chen, S. Nair, and C. Finn (2021) Learning generalizable robotic reward functions from” in-the-wild” human videos. arXiv preprint arXiv:2103.16817. Cited by: §II-B.
+
+[^6]: H. Chen, B. Sun, A. Zhang, M. Pollefeys, and S. Leutenegger (2025) VidBot: learning generalizable 3d actions from in-the-wild 2d human videos for zero-shot robotic manipulation. In Proceedings of the Computer Vision and Pattern Recognition Conference, Cited by: §II-A.
+
+[^7]: C. Chi, Z. Xu, S. Feng, E. Cousineau, Y. Du, B. Burchfiel, R. Tedrake, and S. Song (2023) Diffusion policy: visuomotor policy learning via action diffusion. The International Journal of Robotics Research, pp. 02783649241273668. Cited by: §II-C.
+
+[^8]: D. Damen, H. Doughty, G. M. Farinella, S. Fidler, A. Furnari, E. Kazakos, D. Moltisanti, J. Munro, T. Perrett, W. Price, et al. (2018) Scaling egocentric vision: the epic-kitchens dataset. In Proceedings of the European conference on computer vision (ECCV), Cited by: §II-B.
+
+[^9]: A. Delitzas, A. Takmaz, F. Tombari, R. Sumner, M. Pollefeys, and F. Engelmann (2024) Scenefun3d: fine-grained functionality and affordance understanding in 3d scenes. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, Cited by: §II-A.
+
+[^10]: T. Do, A. Nguyen, and I. Reid (2018) Affordancenet: an end-to-end deep learning approach for object affordance detection. In 2018 IEEE international conference on robotics and automation (ICRA), Cited by: §II-A.
+
+[^11]: H. Fang, C. Wang, H. Fang, M. Gou, J. Liu, H. Yan, W. Liu, Y. Xie, and C. Lu (2023) Anygrasp: robust and efficient grasp perception in spatial and temporal domains. IEEE Transactions on Robotics. Cited by: §I, §IV.
+
+[^12]: H. Geng, Z. Li, Y. Geng, J. Chen, H. Dong, and H. Wang (2023) Partmanip: learning cross-category generalizable part manipulation policy from point cloud observations. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, Cited by: §II-A.
+
+[^13]: J. J. Gibson (2014) The ecological approach to visual perception: classic edition. Psychology press. Cited by: §I.
+
+[^14]: J. J. Gibson (1966) The senses considered as perceptual systems.. Cited by: §I.
+
+[^15]: S. Haldar and L. Pinto (2025) Point policy: unifying observations and actions with key points for robot manipulation. arXiv preprint arXiv:2502.20391. Cited by: §II-B.
+
+[^16]: R. Hoque, P. Huang, D. J. Yoon, M. Sivapurapu, and J. Zhang (2025) EgoDex: learning dexterous manipulation from large-scale egocentric video. arXiv preprint arXiv:2505.11709. Cited by: §II-B.
+
+[^17]: M. Hu, W. Yin, C. Zhang, Z. Cai, X. Long, H. Chen, K. Wang, G. Yu, C. Shen, and S. Shen (2024) Metric3d v2: a versatile monocular geometric foundation model for zero-shot metric depth and surface normal estimation. IEEE Transactions on Pattern Analysis and Machine Intelligence. Cited by: §III-A, §III-B.
+
+[^18]: S. James, Z. Ma, D. R. Arrojo, and A. J. Davison (2020) Rlbench: the robot learning benchmark & learning environment. IEEE Robotics and Automation Letters 5 (2), pp. 3019–3026. Cited by: §I, §IV-B.
+
+[^19]: M. Janner, Y. Du, J. B. Tenenbaum, and S. Levine (2022) Planning with diffusion for flexible behavior synthesis. arXiv preprint arXiv:2205.09991. Cited by: §II-C.
+
+[^20]: Y. Ju, K. Hu, G. Zhang, G. Zhang, M. Jiang, and H. Xu (2024) Robo-abc: affordance generalization beyond categories via semantic correspondence for robot manipulation. In European Conference on Computer Vision, Cited by: §I, §II-A, §IV-A.
+
+[^21]: T. Ke, N. Gkanatsios, and K. Fragkiadaki (2024) 3d diffuser actor: policy diffusion with 3d scene representations. arXiv preprint arXiv:2402.10885. Cited by: §II-C, §III-C.
+
+[^22]: A. Khazatsky, K. Pertsch, S. Nair, A. Balakrishna, S. Dasari, S. Karamcheti, S. Nasiriany, M. K. Srirama, L. Y. Chen, K. Ellis, et al. (2024) Droid: a large-scale in-the-wild robot manipulation dataset. arXiv preprint arXiv:2403.12945. Cited by: §I, §IV-D.
+
+[^23]: N. Kitaev, Ł. Kaiser, and A. Levskaya (2020) Reformer: the efficient transformer. arXiv preprint arXiv:2001.04451. Cited by: §III-C.
+
+[^24]: Y. Kuang, J. Ye, H. Geng, J. Mao, C. Deng, L. Guibas, H. Wang, and Y. Wang (2025) RAM: retrieval-based affordance transfer for generalizable zero-shot robotic manipulation. In Conference on Robot Learning, Cited by: §I, §II-A, TABLE I, TABLE II, TABLE III, §IV.
+
+[^25]: Z. Liang, Y. Mu, H. Ma, M. Tomizuka, M. Ding, and P. Luo (2024) Skilldiffuser: interpretable hierarchical planning via skill abstractions in diffusion-based task execution. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, Cited by: §II-C.
+
+[^26]: F. Liu, K. Fang, P. Abbeel, and S. Levine (2024) Moka: open-vocabulary robotic manipulation through mark-based visual prompting. In First Workshop on Vision-Language Models for Navigation and Manipulation at ICRA 2024, Cited by: §I, §II-A, §IV-B, TABLE I, TABLE II, TABLE III, §IV.
+
+[^27]: S. Liu, Z. Zeng, T. Ren, F. Li, H. Zhang, J. Yang, Q. Jiang, C. Li, J. Yang, H. Su, et al. (2024) Grounding dino: marrying dino with grounded pre-training for open-set object detection. In European conference on computer vision, Cited by: §III-A, §III-B.
+
+[^28]: Y. Liu, Y. Liu, C. Jiang, K. Lyu, W. Wan, H. Shen, B. Liang, Z. Fu, H. Wang, and L. Yi (2022) Hoi4d: a 4d egocentric dataset for category-level human-object interaction. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, Cited by: §II-B.
+
+[^29]: H. Luo, W. Zhai, J. Zhang, Y. Cao, and D. Tao (2022) Learning affordance grounding from exocentric images. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, Cited by: §I, §IV-A.
+
+[^30]: T. Ma, Z. Wang, J. Zhou, M. Wang, and J. Liang (2024) Glover: generalizable open-vocabulary affordance reasoning for task-oriented grasping. arXiv preprint arXiv:2411.12286. Cited by: §I, §II-A.
+
+[^31]: T. Ma, J. Zheng, Z. Wang, Z. Gao, J. Zhou, and J. Liang (2025) GLOVER++: unleashing the potential of affordance learning from human behaviors for robotic manipulation. arXiv preprint arXiv:2505.11865. Cited by: §I, §II-A.
+
+[^32]: K. Mo, L. J. Guibas, M. Mukadam, A. Gupta, and S. Tulsiani (2021) Where2act: from pixels to actions for articulated 3d objects. In Proceedings of the IEEE/CVF International Conference on Computer Vision, Cited by: §II-A.
+
+[^33]: S. Nair, A. Rajeswaran, V. Kumar, C. Finn, and A. Gupta (2022) R3m: a universal visual representation for robot manipulation. arXiv preprint arXiv:2203.12601. Cited by: §II-B.
+
+[^34]: G. Pavlakos, D. Shan, I. Radosavovic, A. Kanazawa, D. Fouhey, and J. Malik (2024) Reconstructing hands in 3d with transformers. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, Cited by: §III-B.
+
+[^35]: S. Qian, W. Chen, M. Bai, X. Zhou, Z. Tu, and L. E. Li (2024) Affordancellm: grounding affordance from vision language models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, Cited by: §I.
+
+[^36]: N. Ravi, V. Gabeur, Y. Hu, R. Hu, C. Ryali, T. Ma, H. Khedr, R. Rädle, C. Rolland, L. Gustafson, et al. (2024) Sam 2: segment anything in images and videos. arXiv preprint arXiv:2408.00714. Cited by: §III-A, §III-B.
+
+[^37]: D. Shan, J. Geng, M. Shu, and D. F. Fouhey (2020) Understanding human hands in contact at internet scale. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, Cited by: §III-B.
+
+[^38]: K. Shaw, S. Bahl, and D. Pathak (2023) Videodex: learning dexterity from internet videos. In Conference on Robot Learning, Cited by: §II-B.
+
+[^39]: M. K. Srirama, S. Dasari, S. Bahl, and A. Gupta (2024) Hrp: human affordances for robotic pre-training. arXiv preprint arXiv:2407.18911. Cited by: §II-B.
+
+[^40]: C. Tang, D. Huang, W. Dong, R. Xu, and H. Zhang (2025) Foundationgrasp: generalizable task-oriented grasping with foundation models. IEEE Transactions on Automation Science and Engineering. Cited by: §I.
+
+[^41]: Y. Tang, W. Huang, Y. Wang, C. Li, R. Yuan, R. Zhang, J. Wu, and L. Fei-Fei UAD: unsupervised affordance distillation for generalization in robotic manipulation. In CoRL 2024 Workshop on Mastering Robot Manipulation in a World of Abundant Data, Cited by: §I, §II-A.
+
+[^42]: G. Team, P. Georgiev, V. I. Lei, R. Burnell, L. Bai, A. Gulati, G. Tanzer, D. Vincent, Z. Pan, S. Wang, et al. (2024) Gemini 1.5: unlocking multimodal understanding across millions of tokens of context. arXiv preprint arXiv:2403.05530. Cited by: §III-B.
+
+[^43]: C. Wang, L. Fan, J. Sun, R. Zhang, L. Fei-Fei, D. Xu, Y. Zhu, and A. Anandkumar (2023) Mimicplay: long-horizon imitation learning by watching human play. arXiv preprint arXiv:2302.12422. Cited by: §II-B.
+
+[^44]: Y. Xiao, Q. Wang, S. Zhang, N. Xue, S. Peng, Y. Shen, and X. Zhou (2024) Spatialtracker: tracking any 2d pixels in 3d space. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition, Cited by: §III-B.
+
+[^45]: M. Xu, Z. Xu, Y. Xu, C. Chi, G. Wetzstein, M. Veloso, and S. Song (2024) Flow as the cross-domain manipulation interface. arXiv preprint arXiv:2407.15208. Cited by: §II-B.
+
+[^46]: R. Xu, J. Zhang, M. Guo, Y. Wen, H. Yang, M. Lin, J. Huang, Z. Li, K. Zhang, L. Wang, et al. (2025) A0: an affordance-aware hierarchical model for general robotic manipulation. arXiv preprint arXiv:2504.12636. Cited by: §II-A.
+
+[^47]: B. Yin, J. Cao, M. Cheng, and Q. Hou (2025) Dformerv2: geometry self-attention for rgbd semantic segmentation. In Proceedings of the Computer Vision and Pattern Recognition Conference, Cited by: §I, §III-C.
+
+[^48]: W. Yuan, J. Duan, V. Blukis, W. Pumacay, R. Krishna, A. Murali, A. Mousavian, and D. Fox (2025) RoboPoint: a vision-language model for spatial affordance prediction in robotics. In Conference on Robot Learning, Cited by: §I, §II-A, TABLE I, TABLE II, §IV.
+
+[^49]: Y. Ze, G. Zhang, K. Zhang, C. Hu, M. Wang, and H. Xu (2024) 3d diffusion policy: generalizable visuomotor policy learning via simple 3d representations. arXiv preprint arXiv:2403.03954. Cited by: §II-C.
+
+[^50]: Y. Zhou, C. Barnes, J. Lu, J. Yang, and H. Li (2019) On the continuity of rotation representations in neural networks. In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition, Cited by: §III-C.
